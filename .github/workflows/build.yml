@@ -1,0 +1,32 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: unzip -q ./*.zip -d project
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Debug keystore
+        working-directory: project
+        run: keytool -genkeypair -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.3.1
+      - name: Build APK
+        working-directory: project
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Publish APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "apk-${{ github.run_number }}" project/app/build/outputs/apk/debug/*.apk --title "Resonance APK" --notes "Debug build" --repo "${{ github.repository }}"
